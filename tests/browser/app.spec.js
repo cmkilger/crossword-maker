@@ -165,3 +165,20 @@ test("small crossword fits A5 and incomplete puzzles cannot export", async ({
   await expect(page.locator("#issues")).toContainText("no shared letters");
   await expect(page.locator("#pdf")).toBeDisabled();
 });
+
+test("startup controls wait for the worksheet font on slow connections", async ({
+  page,
+}) => {
+  await page.route("**/fonts/NotoSans-Regular.ttf", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    await route.continue();
+  });
+  await page.goto("./");
+  await expect(page.locator("#example")).toBeDisabled();
+  await expect(page.locator("#generation-status")).toHaveText(
+    "Preparing your workspace…",
+  );
+  await expect(page.locator("#example")).toBeEnabled();
+  await page.locator("#example").click();
+  await expect(page.locator("#generation-status")).toContainText("12 of 12");
+});

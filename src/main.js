@@ -511,6 +511,11 @@ function wire() {
 }
 async function init() {
   shell();
+  $("#app").setAttribute("aria-busy", "true");
+  $("#generation-status").textContent = "Preparing your workspace…";
+  document
+    .querySelectorAll("button, input, select, textarea")
+    .forEach((el) => (el.disabled = true));
   try {
     await loadFont();
     await document.fonts.load("12px Worksheet");
@@ -534,9 +539,13 @@ async function init() {
       state.puzzles.push(p);
     }
     if (!current()) state.active = state.puzzles[0].id;
+    document
+      .querySelectorAll("button, input, select, textarea")
+      .forEach((el) => (el.disabled = false));
     appearance();
     wire();
     renderPuzzle();
+    $("#app").setAttribute("aria-busy", "false");
     if (!current().layout && valid().some((e) => !e.error)) startSearch();
   } catch (e) {
     notice(`${e.message} Please reload the page.`);

@@ -2,7 +2,7 @@
 
 A classroom crossword worksheet creator. Enter your answers and clues, watch the preview take shape, and print or download a worksheet and answer key.
 
-**[Open Crossword Maker](https://cmkilger.github.io/CrosswordMaker/)**
+**[Open Crossword Maker](https://cmkilger.github.io/crossword-maker/)**
 
 - Automatic across/down layout with a live preview and background search
 - Optional title, name, class period, date, and clue answer lines

@@ -71,13 +71,25 @@ function appearance() {
 }
 function shell() {
   $("#app").innerHTML = `
-<header class="app-header"><a class="brand" href="./" aria-label="Crossword Maker home"><span class="brand-mark" aria-hidden="true">✛</span><span>Crossword <strong>Maker</strong></span></a><div class="header-right"><span class="local-label">Made here. Stays here.</span><label class="theme-label"><span class="sr-only">Appearance</span><select id="theme"><option value="auto">◐ Auto</option><option value="light">☀ Light</option><option value="dark">☾ Dark</option></select></label></div></header>
+<header class="app-toolbar" aria-label="Puzzle controls">
+<label class="sr-only" for="puzzles">Saved puzzles</label><select id="puzzles"></select>
+<button id="new" class="secondary">New puzzle</button><button id="duplicate" class="text-button">Duplicate</button><button id="delete" class="text-button danger">Delete</button>
+<div class="toolbar-end"><button id="export" class="text-button">Back up all</button><button id="import" class="text-button">Import</button><label class="theme-label"><span class="sr-only">Appearance</span><select id="theme"><option value="auto">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select></label></div>
+<input type="file" id="import-file" accept=".json,application/json" hidden></header>
 <div id="notice" class="notice" role="alert" hidden></div>
-<main class="workspace"><aside class="editor"><div class="library-heading"><div><span class="eyebrow">YOUR WORKSPACE</span><h1>A little wordplay.</h1></div><button id="new" class="icon-button" aria-label="New puzzle" title="New puzzle">＋</button></div><label class="field-label" for="puzzles">Saved puzzles</label><select id="puzzles"></select><div class="library-actions"><button id="duplicate" class="text-button">Duplicate</button><button id="export" class="text-button">Back up all</button><button id="import" class="text-button">Import</button><button id="delete" class="text-button danger">Delete</button></div><input type="file" id="import-file" accept=".json,application/json" hidden>
-<div class="divider"></div><div class="section-heading"><span class="step">01</span><h2>Make it yours</h2></div><label class="field-label" for="puzzle-name">Puzzle name <span>Only for your library</span></label><input id="puzzle-name" maxlength="200" placeholder="e.g. Chapter 4 vocabulary"><div class="option-grid"><label><input type="checkbox" data-option="title"> Title</label><label><input type="checkbox" data-option="name"> Name</label><label><input type="checkbox" data-option="classPeriod"> Class period</label><label><input type="checkbox" data-option="date"> Date</label></div><div id="title-field"><label class="field-label" for="title">Worksheet title</label><input id="title" maxlength="500" placeholder="Give your worksheet a title"></div><label class="check-row"><input type="checkbox" data-option="answerLines"> Answer line after each clue</label>
-<div class="divider"></div><div class="section-heading"><span class="step">02</span><h2>Add your words</h2><button id="bulk" class="text-button">Bulk paste ↗</button></div><p class="helper">Answers use A–Z. We’ll find the intersections.</p><div id="entries"></div><button id="add" class="add-button">＋ Add a word</button><button id="example" class="text-button example">Try a vocabulary example</button><div class="editor-footer"><span id="save-status" role="status">Saved in this browser</span><p>Stored on this device. Back up to move browsers.</p></div></aside>
-<section class="preview-panel" aria-label="Worksheet preview"><div class="preview-toolbar"><div class="preview-title"><span class="eyebrow">THE FINISHED PAGE</span><h2>Print a little possibility.</h2></div><label class="paper-select"><span class="sr-only">Paper size</span><select id="paper"><option value="letter">Letter · 8.5 × 11 in</option><option value="legal">Legal · 8.5 × 14 in</option><option value="a4">A4 · 210 × 297 mm</option><option value="a5">A5 · 148 × 210 mm</option></select></label></div><div class="preview-controls"><div class="segmented" aria-label="Preview type"><button id="worksheet" aria-pressed="true">Worksheet</button><button id="answer-key" aria-pressed="false">Answer key</button></div><button id="regenerate" class="text-button">⟳ Regenerate layout</button></div><div class="generation-line"><span class="status-dot"></span><span id="generation-status" role="status" aria-live="polite"></span></div><div id="issues" class="issues" hidden></div><div class="paper-stage"><div id="paper-preview" class="paper"></div><div id="empty-preview"><span class="empty-cross" aria-hidden="true">✛</span><h3>Good puzzles start<br>with a few good words.</h3><p>Add your answers and clues.<br>Your worksheet will come together here.</p></div></div><div class="output-bar"><label><span class="sr-only">Pages to export</span><select id="output-mode"><option value="worksheet">Worksheet only</option><option value="key">Answer key only</option><option value="both">Worksheet + answer key</option></select></label><div><button id="print" class="secondary">Print</button><button id="pdf" class="primary">Download PDF <span aria-hidden="true">↓</span></button></div></div><p class="preview-note">One page. Ready for the classroom. <span id="page-detail"></span></p></section></main>
-<dialog id="bulk-dialog"><form method="dialog"><div class="dialog-heading"><h2>A quicker way to add words</h2><button class="icon-button" value="cancel" aria-label="Close">×</button></div><p>Copy two columns from a spreadsheet: <strong>answer</strong>, then <strong>clue</strong>. One pair per row, without a header. These will be added to your existing words.</p><label class="field-label" for="bulk-input">Answers and clues</label><textarea id="bulk-input" rows="10" placeholder="PLANET&#9;A world orbiting a star"></textarea><p id="bulk-error" class="error" role="alert"></p><button id="bulk-add" type="button" class="primary">Add words</button></form></dialog>
+<main class="workspace"><section class="editor" aria-label="Puzzle editor">
+<div class="inline-field"><label for="puzzle-name">Puzzle name</label><input id="puzzle-name" maxlength="200" placeholder="Untitled puzzle"></div>
+<fieldset class="worksheet-options"><legend>Worksheet fields</legend><div class="option-grid"><label><input type="checkbox" data-option="title"> Title</label><label><input type="checkbox" data-option="name"> Name</label><label><input type="checkbox" data-option="classPeriod"> Class period</label><label><input type="checkbox" data-option="date"> Date</label><label><input type="checkbox" data-option="answerLines"> Clue answer lines</label></div></fieldset>
+<div id="title-field" class="inline-field"><label for="title">Printed title</label><input id="title" maxlength="500" placeholder="Worksheet title"></div>
+<div class="section-heading"><h1>Answers and clues</h1><button id="bulk" class="text-button">Bulk paste</button></div><p class="helper">Answers use A–Z.</p>
+<div class="entries-table"><table aria-label="Answers and clues"><colgroup><col class="number-column"><col class="answer-column"><col><col class="remove-column"></colgroup><thead><tr><th scope="col"><span class="sr-only">Row</span></th><th scope="col">Answer</th><th scope="col">Clue</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody id="entries"></tbody></table></div>
+<div class="entry-actions"><button id="add" class="secondary">Add row</button><button id="example" class="text-button">Load example</button></div>
+<div class="editor-footer"><span id="save-status" role="status">Saved in this browser</span><span>Back up to move browsers.</span></div></section>
+<section class="preview-panel" aria-label="Worksheet preview"><div class="preview-toolbar"><div class="segmented" aria-label="Preview type"><button id="worksheet" aria-pressed="true">Worksheet</button><button id="answer-key" aria-pressed="false">Answer key</button></div><label class="paper-select"><span class="sr-only">Paper size</span><select id="paper"><option value="letter">Letter · 8.5 × 11 in</option><option value="legal">Legal · 8.5 × 14 in</option><option value="a4">A4 · 210 × 297 mm</option><option value="a5">A5 · 148 × 210 mm</option></select></label></div>
+<div class="preview-controls"><div class="generation-line"><span class="status-dot"></span><span id="generation-status" role="status" aria-live="polite"></span></div><button id="regenerate" class="text-button">Regenerate</button></div>
+<div id="issues" class="issues" hidden></div><div class="paper-stage"><div id="paper-preview" class="paper"></div><div id="empty-preview"><p>Enter answers and clues to preview the worksheet.</p></div></div>
+<div class="output-bar"><label><span class="sr-only">Pages to export</span><select id="output-mode"><option value="worksheet">Worksheet only</option><option value="key">Answer key only</option><option value="both">Worksheet + answer key</option></select></label><div><button id="print" class="secondary">Print</button><button id="pdf" class="primary">Download PDF</button></div></div><span id="page-detail" class="sr-only"></span></section></main>
+<dialog id="bulk-dialog"><form method="dialog"><div class="dialog-heading"><h2>Bulk paste</h2><button class="secondary" value="cancel" aria-label="Close">Close</button></div><p>Copy two columns from a spreadsheet: <strong>answer</strong>, then <strong>clue</strong>. One pair per row, without a header. These will be added to your existing words.</p><label class="field-label" for="bulk-input">Answers and clues</label><textarea id="bulk-input" rows="10" placeholder="PLANET&#9;A world orbiting a star"></textarea><p id="bulk-error" class="error" role="alert"></p><button id="bulk-add" type="button" class="primary">Add words</button></form></dialog>
 <dialog id="delete-dialog"><form method="dialog"><h2>Delete this puzzle?</h2><p id="delete-message"></p><div class="dialog-actions"><button value="cancel" class="secondary">Keep puzzle</button><button value="delete" class="destructive">Delete puzzle</button></div></form></dialog><div id="print-pages"></div>`;
 }
 function library() {
@@ -109,9 +121,31 @@ function renderEntries() {
   $("#entries").innerHTML = p.entries
     .map((e, i) => {
       const error = checked.find((v) => v.id === e.id)?.error;
-      return `<div class="entry" data-id="${esc(e.id)}"><div class="entry-index">${String(i + 1).padStart(2, "0")}</div><div class="entry-fields"><label class="sr-only" for="answer-${esc(e.id)}">Answer ${i + 1}</label><input id="answer-${esc(e.id)}" data-entry="answer" value="${esc(e.answer)}" maxlength="60" placeholder="ANSWER" autocomplete="off" spellcheck="false" aria-describedby="error-${esc(e.id)}"><label class="sr-only" for="clue-${esc(e.id)}">Clue ${i + 1}</label><textarea id="clue-${esc(e.id)}" data-entry="clue" rows="2" maxlength="2000" placeholder="Write a clue…">${esc(e.clue)}</textarea><p class="entry-error" id="error-${esc(e.id)}">${esc(error || "")}</p></div><button class="remove-entry" aria-label="Remove word ${i + 1}" data-remove="${esc(e.id)}">×</button></div>`;
+      return `<tr class="entry" data-id="${esc(e.id)}"><th scope="row" class="entry-index">${i + 1}</th><td><label class="sr-only" for="answer-${esc(e.id)}">Answer ${i + 1}</label><input id="answer-${esc(e.id)}" data-entry="answer" value="${esc(e.answer)}" maxlength="60" placeholder="Answer" autocomplete="off" spellcheck="false" aria-describedby="error-${esc(e.id)}"><p class="entry-error" id="error-${esc(e.id)}">${esc(error || "")}</p></td><td><label class="sr-only" for="clue-${esc(e.id)}">Clue ${i + 1}</label><textarea id="clue-${esc(e.id)}" data-entry="clue" rows="1" maxlength="2000" placeholder="Clue">${esc(e.clue)}</textarea></td><td><button class="remove-entry text-button" aria-label="Remove word ${i + 1}" data-remove="${esc(e.id)}">Remove</button></td></tr>`;
     })
     .join("");
+  document.querySelectorAll("[data-entry=clue]").forEach(sizeClue);
+}
+function sizeClue(el) {
+  el.style.height = "auto";
+  el.style.height = `${el.scrollHeight + 2}px`;
+}
+function fitPreview() {
+  const stage = $(".paper-stage"),
+    paper = $("#paper-preview");
+  const svg = paper?.querySelector("svg");
+  if (!svg || !stage.clientHeight) return;
+  const ratio = svg.viewBox.baseVal.width / svg.viewBox.baseVal.height;
+  const style = getComputedStyle(stage);
+  const width =
+    stage.clientWidth -
+    parseFloat(style.paddingLeft) -
+    parseFloat(style.paddingRight);
+  const height =
+    stage.clientHeight -
+    parseFloat(style.paddingTop) -
+    parseFloat(style.paddingBottom);
+  paper.style.width = `${Math.max(0, Math.min(width, height * ratio))}px`;
 }
 function valid() {
   return validateEntries(current().entries.filter((e) => e.answer || e.clue));
@@ -127,7 +161,7 @@ function renderPreview() {
   $("#paper-preview").innerHTML = pageSVG(page);
   $("#paper-preview").style.aspectRatio = `${page.width}/${page.height}`;
   $("#empty-preview").hidden = hasWords;
-  $("#paper-preview").style.opacity = "1";
+  fitPreview();
   $("#generation-status").textContent = generating
     ? "Finding a great fit…"
     : hasWords
@@ -345,6 +379,7 @@ function wire() {
   $("#entries").oninput = (e) => {
     const field = e.target.dataset.entry;
     if (!field) return;
+    if (field === "clue") sizeClue(e.target);
     const entry = current().entries.find(
       (v) => v.id === e.target.closest(".entry").dataset.id,
     );
@@ -544,6 +579,12 @@ async function init() {
       .forEach((el) => (el.disabled = false));
     appearance();
     wire();
+    const observer = new ResizeObserver(() => {
+      fitPreview();
+      document.querySelectorAll("[data-entry=clue]").forEach(sizeClue);
+    });
+    observer.observe($(".paper-stage"));
+    observer.observe($(".editor"));
     renderPuzzle();
     $("#app").setAttribute("aria-busy", "false");
     if (!current().layout && valid().some((e) => !e.error)) startSearch();

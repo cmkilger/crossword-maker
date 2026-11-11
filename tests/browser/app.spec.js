@@ -7,7 +7,7 @@ test("classroom workflow, preferences, persistence, PDF, backup, deletion and re
   await page.goto("./");
   await expect(page.locator("#puzzle-name")).toBeVisible();
   await expect(page.locator('[data-option="name"]')).not.toBeChecked();
-  await page.getByRole("button", { name: "Try a vocabulary example" }).click();
+  await page.getByRole("button", { name: "Load example" }).click();
   await expect(page.locator("#generation-status")).toContainText("12 of 12", {
     timeout: 15000,
   });
@@ -120,7 +120,7 @@ test("page sizing, long-content warnings, duplicate, system appearance and print
     await page
       .locator("body")
       .evaluate((e) => getComputedStyle(e).backgroundColor),
-  ).toBe("rgb(23, 35, 31)");
+  ).toBe("rgb(32, 33, 36)");
   await page.locator("#duplicate").click();
   await expect(page.locator("#puzzle-name")).toHaveValue(
     "AI vocabulary (copy)",
@@ -181,4 +181,72 @@ test("startup controls wait for the worksheet font on slow connections", async (
   await expect(page.locator("#example")).toBeEnabled();
   await page.locator("#example").click();
   await expect(page.locator("#generation-status")).toContainText("12 of 12");
+});
+
+test("compact table and full-page preview fit desktop viewports without page scrolling", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await page.locator("#example").click();
+  await expect(page.locator("#pdf")).toBeEnabled();
+  await expect(
+    page.getByRole("table", { name: "Answers and clues" }),
+  ).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(12);
+  await expect(page.locator("body")).not.toContainText(
+    /A little wordplay|Print a little possibility|Made here/,
+  );
+  for (const viewport of [
+    { width: 1440, height: 900 },
+    { width: 1280, height: 720 },
+    { width: 900, height: 600 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await expect
+      .poll(async () =>
+        page.evaluate(() => {
+          const paper = document
+            .querySelector("#paper-preview")
+            .getBoundingClientRect();
+          const stage = document
+            .querySelector(".paper-stage")
+            .getBoundingClientRect();
+          const output = document.querySelector("#pdf").getBoundingClientRect();
+          return (
+            paper.width > 0 &&
+            paper.top >= stage.top &&
+            paper.bottom <= stage.bottom + 1 &&
+            paper.left >= stage.left &&
+            paper.right <= stage.right + 1 &&
+            output.bottom <= innerHeight &&
+            document.documentElement.scrollHeight <= innerHeight + 1
+          );
+        }),
+      )
+      .toBe(true);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const answer = await page
+    .locator('[data-entry="answer"]')
+    .first()
+    .boundingBox();
+  const clue = await page.locator('[data-entry="clue"]').first().boundingBox();
+  expect(Math.abs(answer.y - clue.y)).toBeLessThan(2);
+  expect(clue.x).toBeGreaterThan(answer.x + answer.width);
+  await page
+    .locator('[data-entry="clue"]')
+    .first()
+    .fill(
+      "A longer clue that wraps over multiple lines while staying in the same compact table row.",
+    );
+  expect(
+    await page
+      .locator('[data-entry="clue"]')
+      .first()
+      .evaluate((el) => el.scrollHeight <= el.clientHeight + 1),
+  ).toBe(true);
+  await page.locator("#theme").selectOption("light");
+  await page.screenshot({ path: "test-results/compact-light.png" });
+  await page.locator("#theme").selectOption("dark");
+  await page.screenshot({ path: "test-results/compact-dark.png" });
 });

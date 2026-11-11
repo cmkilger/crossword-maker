@@ -306,6 +306,7 @@ function wire() {
   $("#delete").onclick = () => {
     $("#delete-message").textContent =
       `“${current().name || "Untitled puzzle"}” will be permanently removed from this browser.`;
+    $("#delete-dialog").returnValue = "";
     $("#delete-dialog").showModal();
   };
   $("#delete-dialog").onclose = () => {

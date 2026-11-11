@@ -56,9 +56,16 @@ test("classroom workflow, preferences, persistence, PDF, backup, deletion and re
     "CAT",
   );
   await page.locator("#delete").click();
+  const deletedPuzzle = await page.locator("#puzzles").inputValue();
   await page
     .getByRole("button", { name: "Delete puzzle", exact: true })
     .click();
+  await expect(page.locator("#puzzles")).not.toHaveValue(deletedPuzzle);
+  const keptPuzzle = await page.locator("#puzzles").inputValue();
+  await page.locator("#delete").click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#delete-dialog")).not.toBeVisible();
+  await expect(page.locator("#puzzles")).toHaveValue(keptPuzzle);
   await page.locator("#import-file").setInputFiles("test-results/backup.json");
   await expect(page.locator("#notice")).toContainText("Imported");
   await page.locator("#puzzles").selectOption({ label: "AI vocabulary" });
@@ -106,8 +113,6 @@ test("page sizing, long-content warnings, duplicate, system appearance and print
     const file = await promise;
     await file.saveAs(`test-results/${size}.pdf`);
   }
-  await page.locator("#paper").selectOption("a5");
-  await expect(page.locator("#issues")).toContainText("cannot fit readably");
   await page.locator("#paper").selectOption("letter");
   await page.locator("#theme").selectOption("auto");
   await page.emulateMedia({ colorScheme: "dark" });

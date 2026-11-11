@@ -1,6 +1,6 @@
 import { generate } from "./generator.js";
 self.onmessage = ({ data }) => {
-  let last = 0;
+  let last = -Infinity;
   const layout = generate(data.entries, {
     budget: data.budget,
     onProgress: (layout) => {

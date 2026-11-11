@@ -34,7 +34,7 @@ npm run preview
 
 ## Releases and deployment
 
-Publish a GitHub release from a version tag (for example `v1.0.1`). The **Deploy release to GitHub Pages** workflow checks out that release tag, installs dependencies, runs generator and browser tests, builds, and deploys the artifact to Pages. Ordinary pushes run CI without publishing. A workflow-dispatch fallback can redeploy an existing release tag. Enable **Settings → Pages → Source → GitHub Actions** when forking.
+Publish a GitHub release from a version tag (for example `v1.0.1`). The **Deploy release to GitHub Pages** workflow checks out that release tag, installs dependencies, runs generator and browser tests, builds, and deploys the artifact to Pages. Ordinary pushes run CI without publishing. A workflow-dispatch fallback can redeploy an existing release tag. Enable **Settings → Pages → Source → GitHub Actions** when forking. In the `github-pages` environment, allow release tags matching `v*` as deployment sources (GitHub initially allows only `main`).
 
 The release workflow accepts stable published releases only. Do not use a prerelease as a production deployment.
 

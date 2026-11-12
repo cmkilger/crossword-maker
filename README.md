@@ -10,7 +10,7 @@ A classroom crossword worksheet creator. Enter your answers and clues, watch the
 - Letter, Legal, A4, and A5; readable single-page output
 - Separate answer key; vector PDF downloads and printing
 - Multiple puzzles, duplication, autosave, and confirmed deletion
-- Bulk paste: answer and clue separated by a comma, tab, or spaces, one pair per line without a header; answers can be lowercase or uppercase
+- Bulk add: answer and clue separated by a comma, tab, or spaces, one pair per line without a header; answers can be lowercase or uppercase
 - JSON backup and import; importing keeps existing puzzles
 - Light, dark, and system appearance
 - Browser-local IndexedDB storage; no account, server, analytics, or uploaded puzzle data

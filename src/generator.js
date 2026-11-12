@@ -1,3 +1,4 @@
+import { generateDense } from "./dense-generator.js";
 // Open-grid constraint search. Each restart explores alternative placements,
 // retaining the best valid connected arrangement within a fixed time budget.
 export function validateEntries(entries) {
@@ -52,6 +53,65 @@ export function canPlace(p, cells) {
       return -1;
   }
   return crossings;
+}
+// Validate final geometry rather than insertion order: dense layouts may need
+// neighboring words to be constructed together before all runs are complete.
+export function isValidLayout(placed) {
+  if (!placed.length) return true;
+  const cells = new Map();
+  for (let owner = 0; owner < placed.length; owner++) {
+    const p = placed[owner];
+    if (
+      !["across", "down"].includes(p.dir) ||
+      !Number.isInteger(p.x) ||
+      !Number.isInteger(p.y) ||
+      !/^[A-Z]+$/.test(p.answer)
+    )
+      return false;
+    for (let i = 0; i < p.answer.length; i++) {
+      const x = p.x + (p.dir === "across" ? i : 0),
+        y = p.y + (p.dir === "down" ? i : 0),
+        k = key(x, y);
+      const cell = cells.get(k) || {
+        x,
+        y,
+        letter: p.answer[i],
+        across: null,
+        down: null,
+      };
+      if (cell.letter !== p.answer[i] || cell[p.dir] !== null) return false;
+      cell[p.dir] = owner;
+      cells.set(k, cell);
+    }
+  }
+  for (const c of cells.values()) {
+    for (const [dx, dy, dir] of [
+      [1, 0, "across"],
+      [0, 1, "down"],
+    ]) {
+      const neighbor = cells.get(key(c.x + dx, c.y + dy));
+      if (neighbor && (c[dir] === null || neighbor[dir] !== c[dir]))
+        return false;
+    }
+  }
+  const seen = new Set(),
+    queue = [cells.keys().next().value];
+  while (queue.length) {
+    const k = queue.pop();
+    if (seen.has(k)) continue;
+    seen.add(k);
+    const c = cells.get(k);
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const next = key(c.x + dx, c.y + dy);
+      if (cells.has(next) && !seen.has(next)) queue.push(next);
+    }
+  }
+  return seen.size === cells.size;
 }
 export function bounds(placed) {
   if (!placed.length) return { minX: 0, minY: 0, width: 0, height: 0 };
@@ -116,6 +176,14 @@ export function generate(
 ) {
   if (!entries.length) return { ...numberLayout([]), unplaced: [] };
   const deadline = performance.now() + budget;
+  const dense = generateDense(entries, {
+    budget: Math.min(600, budget * 0.35),
+  });
+  if (dense && isValidLayout(dense)) {
+    const result = { ...numberLayout(dense), unplaced: [] };
+    onProgress(result);
+    return result;
+  }
   let best = [],
     bestScore = -Infinity,
     visited = 0;

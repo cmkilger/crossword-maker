@@ -11,8 +11,7 @@ import {
 import {
   validateEntries,
   disconnectedGroups,
-  canPlace,
-  cellsFor,
+  isValidLayout,
   numberLayout,
 } from "./generator.js";
 import { loadFont, makePage, pageSVG, exportPDF, sizes } from "./page.js";
@@ -76,8 +75,8 @@ function shell() {
 <header class="app-toolbar" aria-label="Puzzle controls">
 <label class="sr-only" for="puzzles">Saved puzzles</label><select id="puzzles"></select>
 <button id="new" class="secondary">New puzzle</button><button id="duplicate" class="text-button">Duplicate</button><button id="delete" class="text-button danger">Delete</button>
-<div class="toolbar-end"><button id="export" class="text-button">Back up all</button><button id="import" class="text-button">Import</button><label class="theme-label"><span class="sr-only">Appearance</span><select id="theme"><option value="auto">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select></label></div>
-<input type="file" id="import-file" accept=".json,application/json" hidden></header>
+<div class="toolbar-end"><button id="export" class="text-button">Back up all</button><label id="import" class="text-button file-import" for="import-file"><span id="import-label">Import</span></label><input type="file" id="import-file" class="sr-only" accept=".json,application/json" aria-label="Import puzzle backup"><label class="theme-label"><span class="sr-only">Appearance</span><select id="theme"><option value="auto">Auto</option><option value="light">Light</option><option value="dark">Dark</option></select></label></div>
+</header>
 <div id="notice" class="notice" role="alert" hidden></div>
 <main class="workspace"><section class="editor" aria-label="Puzzle editor">
 <div class="inline-field"><label for="puzzle-name">Puzzle name</label><input id="puzzle-name" maxlength="200" placeholder="Untitled puzzle"></div>
@@ -91,7 +90,7 @@ function shell() {
 <div class="preview-controls"><div class="generation-line"><span class="status-dot"></span><span id="generation-status" role="status" aria-live="polite"></span></div><button id="regenerate" class="text-button">Regenerate</button></div>
 <div id="issues" class="issues" hidden></div><div class="paper-stage"><div id="paper-preview" class="paper"></div><div id="empty-preview"><p>Enter answers and clues to preview the worksheet.</p></div></div>
 <div class="output-bar"><div><button id="print" class="secondary">Print</button><button id="pdf" class="primary">Download PDF</button></div></div><span id="page-detail" class="sr-only"></span></section></main>
-<dialog id="bulk-dialog"><form method="dialog"><div class="dialog-heading"><h2>Bulk paste</h2><button class="secondary" value="cancel" aria-label="Close">Close</button></div><p>Copy two columns from a spreadsheet: <strong>answer</strong>, then <strong>clue</strong>. One pair per row, without a header. These will be added to your existing words.</p><label class="field-label" for="bulk-input">Answers and clues</label><textarea id="bulk-input" rows="10" placeholder="PLANET&#9;A world orbiting a star"></textarea><p id="bulk-error" class="error" role="alert"></p><button id="bulk-add" type="button" class="primary">Add words</button></form></dialog>
+<dialog id="bulk-dialog"><form method="dialog"><div class="dialog-heading"><h2>Bulk paste</h2><button class="secondary" value="cancel" aria-label="Close">Close</button></div><p>Enter <strong>ANSWER, clue</strong> on each line. A tab or one or more spaces also works, including columns pasted from a spreadsheet. Answers can be lowercase or uppercase. Omit the header. These will be added to your existing words.</p><label class="field-label" for="bulk-input">Answers and clues</label><textarea id="bulk-input" rows="10" placeholder="PLANET, A world orbiting a star&#10;OCEAN, A large body of salt water"></textarea><p id="bulk-error" class="error" role="alert"></p><button id="bulk-add" type="button" class="primary">Add words</button></form></dialog>
 <dialog id="delete-dialog"><form method="dialog"><h2>Delete this puzzle?</h2><p id="delete-message"></p><div class="dialog-actions"><button value="cancel" class="secondary">Keep puzzle</button><button value="delete" class="destructive">Delete puzzle</button></div></form></dialog><dialog id="example-dialog"><form method="dialog"><h2>Load example puzzle?</h2><p>Your current puzzle will stay saved. A new example puzzle will open.</p><div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button value="load" class="primary">Load example</button></div></form></dialog><dialog id="remove-dialog"><form method="dialog"><h2 id="remove-heading">Remove row?</h2><p id="remove-message"></p><div class="dialog-actions"><button value="cancel" class="secondary">Keep rows</button><button value="remove" class="destructive">Remove</button></div></form></dialog><div id="print-pages"></div>`;
 }
 function library() {
@@ -281,7 +280,7 @@ function renderPreview() {
     );
   if (!page.fits)
     messages.push(
-      "This puzzle cannot fit readably on one page. Use larger paper or shorten the puzzle or clues.",
+      "The words are placed, but this layout cannot fit readably on one page. The preview is scaled down for inspection. Try regenerating a more compact grid, larger paper, or shorter clues.",
     );
   $("#issues").hidden = !messages.length;
   $("#issues").textContent = messages.join(" ");
@@ -388,9 +387,9 @@ function checkedLayout(p) {
       )
         return null;
       const next = { ...e, x: raw.x, y: raw.y, dir: raw.dir };
-      if (placed.length && canPlace(next, cellsFor(placed)) < 1) return null;
       placed.push(next);
     }
+    if (!isValidLayout(placed)) return null;
     return {
       ...numberLayout(placed),
       unplaced: entries
@@ -533,6 +532,9 @@ function wire() {
     $("#bulk-error").textContent = "";
     $("#bulk-dialog").showModal();
   };
+  $("#bulk-input").oninput = () => {
+    $("#bulk-error").textContent = "";
+  };
   $("#bulk-add").onclick = () => {
     try {
       const entries = parseBulk($("#bulk-input").value);
@@ -591,11 +593,14 @@ function wire() {
       "crossword-maker-backup.json",
       "application/json",
     );
-  $("#import").onclick = () => $("#import-file").click();
   $("#import-file").onchange = async (e) => {
+    const input = e.target;
+    const file = input.files[0];
+    if (!file) return;
+    input.disabled = true;
+    $("#import-label").textContent = "Importing…";
+    notice(`Importing “${file.name}”…`);
     try {
-      const file = e.target.files[0];
-      if (!file) return;
       if (file.size > 10 * 1024 * 1024)
         throw new Error("Choose a backup smaller than 10 MB.");
       const puzzles = validateBackup(JSON.parse(await file.text()));
@@ -607,9 +612,12 @@ function wire() {
         `Imported ${puzzles.length} ${puzzles.length === 1 ? "puzzle" : "puzzles"}. Existing puzzles were kept.`,
       );
     } catch (error) {
-      notice(error.message);
+      notice(`Could not import backup: ${error.message}`);
+    } finally {
+      input.value = "";
+      input.disabled = false;
+      $("#import-label").textContent = "Import";
     }
-    e.target.value = "";
   };
   const loadExample = () => {
     const p = newPuzzle(state.defaults);

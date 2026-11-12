@@ -146,6 +146,9 @@ test("page sizing, long-content warnings, duplicate, system appearance and print
     await clue.fill("An unusually long clue. ".repeat(85));
   }
   await expect(page.locator("#issues")).toContainText("cannot fit readably");
+  expect(await page.locator("#paper-preview svg rect").count()).toBeGreaterThan(
+    1,
+  );
   await expect(page.locator("#pdf")).toBeDisabled();
 });
 
@@ -360,4 +363,115 @@ test("populated row removal confirms, while empty and bulk rows follow selection
     .getByRole("button", { name: "Remove word 1", exact: true })
     .click();
   await expect(page.locator("#remove-dialog")).toBeVisible();
+});
+
+test("bulk paste accepts the typed comma-separated example and preserves clue commas", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await page.locator("#bulk").click();
+  await expect(page.locator("#bulk-dialog")).toContainText("ANSWER, clue");
+  await page
+    .locator("#bulk-input")
+    .fill(
+      "planet, A world orbiting a star\noCeAn, A large body of salt water\ncat   A feline, often a pet\ndog A canine",
+    );
+  await page.locator("#bulk-add").click();
+  await expect(page.locator("#bulk-dialog")).not.toBeVisible();
+  await expect(page.locator('[data-entry="answer"]')).toHaveCount(4);
+  expect(
+    await page
+      .locator('[data-entry="answer"]')
+      .evaluateAll((elements) => elements.map((el) => el.value)),
+  ).toEqual(["PLANET", "OCEAN", "CAT", "DOG"]);
+  await expect(page.locator('[data-entry="clue"]').nth(2)).toHaveValue(
+    "A feline, often a pet",
+  );
+});
+
+test("dense neighboring words retain their layout after reopening", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await page.locator("#bulk").click();
+  const words = [
+    "ABCDE",
+    "FGHIJ",
+    "KLMNO",
+    "PQRST",
+    "UVWXY",
+    "AFKPU",
+    "BGLQV",
+    "CHMRW",
+    "DINSX",
+    "EJOTY",
+  ];
+  await page
+    .locator("#bulk-input")
+    .fill(
+      words.map((word, i) => `${word}, Synthetic clue ${i + 1}`).join("\n"),
+    );
+  await page.locator("#bulk-add").click();
+  await expect(page.locator("#generation-status")).toContainText(
+    "10 of 10 words placed · 5 × 5 grid",
+  );
+  const before = await page.locator("#paper-preview").innerHTML();
+  await expect(page.locator("#save-status")).toHaveText(
+    "Saved in this browser",
+  );
+  await page.reload();
+  await expect(page.locator("#generation-status")).toContainText(
+    "10 of 10 words placed · 5 × 5 grid",
+  );
+  expect(await page.locator("#paper-preview").innerHTML()).toBe(before);
+  await expect(page.locator("#pdf")).toBeEnabled();
+});
+
+test("Import opens a native chooser and reports successful or invalid files", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await expect(page.locator("#import-file")).toBeEnabled();
+  const backup = {
+    format: "crossword-maker",
+    version: 1,
+    puzzles: [
+      {
+        name: "Restored puzzle",
+        title: "",
+        options: {},
+        entries: [{ id: "test-word", answer: "CAT", clue: "A feline" }],
+        layout: null,
+      },
+    ],
+  };
+  const choose = async (file) => {
+    const pending = page.waitForEvent("filechooser");
+    await page.locator("#import").click();
+    await (await pending).setFiles(file);
+  };
+  await choose({
+    name: "backup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(backup)),
+  });
+  await expect(page.locator("#notice")).toContainText("Imported 1 puzzle");
+  await expect(page.locator("#puzzle-name")).toHaveValue("Restored puzzle");
+  await expect(page.locator("#puzzles option")).toHaveCount(2);
+  await choose({
+    name: "broken.json",
+    mimeType: "application/json",
+    buffer: Buffer.from("{broken"),
+  });
+  await expect(page.locator("#notice")).toContainText(
+    "Could not import backup",
+  );
+  await expect(page.locator("#puzzle-name")).toHaveValue("Restored puzzle");
+  await expect(page.locator("#import-file")).toBeEnabled();
+  await choose({
+    name: "backup.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(backup)),
+  });
+  await expect(page.locator("#puzzles option")).toHaveCount(3);
 });

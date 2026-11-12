@@ -5,11 +5,12 @@ A classroom crossword worksheet creator. Enter your answers and clues, watch the
 **[Open Crossword Maker](https://cmkilger.github.io/crossword-maker/)**
 
 - Automatic across/down layout with a live preview and background search
+- Black blocks for compact grids, open gaps for looser layouts, and adaptive clue columns when needed
 - Optional title, name, class period, date, and clue answer lines
 - Letter, Legal, A4, and A5; readable single-page output
 - Separate answer key; vector PDF downloads and printing
 - Multiple puzzles, duplication, autosave, and confirmed deletion
-- Spreadsheet paste (answer and clue columns, no header)
+- Bulk paste: answer and clue separated by a comma, tab, or spaces, one pair per line without a header; answers can be lowercase or uppercase
 - JSON backup and import; importing keeps existing puzzles
 - Light, dark, and system appearance
 - Browser-local IndexedDB storage; no account, server, analytics, or uploaded puzzle data
@@ -40,7 +41,7 @@ The release workflow accepts stable published releases only. Do not use a prerel
 
 ## How layout search works
 
-The generator uses valid letter intersections, scored candidate placements, bounded backtracking, and randomized restarts. A worker searches for up to 1.6 seconds after a 450 ms typing debounce. The preview receives improvements during search. Clue and formatting changes preserve geometry. Regenerate tries new choices; search is heuristic and does not prove an optimal layout or that every unplaced answer is impossible. Layouts prioritize answer coverage, then intersections and compactness. A shared point-based renderer lays out the preview and PDF, shrinking clue type from 12 to 9 pt and refusing grids below a 13 pt cell size. No filler answers are invented.
+The generator first tries a constraint search for a dense, fully checked grid, where every letter belongs to both an across and a down answer. If the supplied word list cannot form such a grid or the bounded search finds no solution, it falls back to an open-grid search using valid letter intersections, scored candidate placements, bounded backtracking, and randomized restarts. A worker searches for up to 1.6 seconds after a 450 ms typing debounce. The preview receives improvements during search. Clue and formatting changes preserve geometry. Regenerate tries new choices; search is heuristic and does not prove an optimal layout or that every unplaced answer is impossible. Layouts prioritize answer coverage, then intersections and compactness. A shared point-based renderer lays out the preview and PDF, shrinking clue type from 12 to 9 pt and refusing grids below a 13 pt cell size. No filler answers are invented.
 
 See [requirements](docs/requirements/product.md) for expected behavior and verification references.
 

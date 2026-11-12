@@ -45,23 +45,44 @@ export function newPuzzle(options = defaults) {
   };
 }
 export function parseBulk(input) {
-  const rows = input
-    .trim()
-    .split(/\r?\n/)
-    .filter((l) => l.trim());
-  return rows.map((row, i) => {
-    const parts = row.split("\t");
-    if (parts.length !== 2)
-      throw new Error(
-        `Row ${i + 1}: paste two spreadsheet columns: answer, then clue.`,
-      );
-    return {
-      id: crypto.randomUUID(),
-      answer: parts[0].trim().toUpperCase(),
-      clue: parts[1].trim(),
-    };
-  });
+  const unquote = (value) => {
+    const trimmed = value.trim();
+    return /^"(?:[^"]|"")*"$/.test(trimmed)
+      ? trimmed.slice(1, -1).replaceAll('""', '"')
+      : trimmed;
+  };
+  return input
+    .split(/\r\n|\r|\n/)
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => row.trim())
+    .map(({ row, index }) => {
+      let parts;
+      if (row.includes("\t")) {
+        parts = row.split("\t");
+        if (parts.length !== 2)
+          throw new Error(
+            `Row ${index + 1}: paste exactly two spreadsheet columns: answer, then clue.`,
+          );
+      } else {
+        // A comma or whitespace after the answer is the separator; punctuation
+        // and spaces in the clue remain untouched.
+        const match = row.match(
+          /^\s*("(?:[^"]|"")*"|[^\s,]+)(?:\s*,\s*|\s+)(.*)$/,
+        );
+        parts = match ? [match[1], match[2]] : [];
+      }
+      if (parts.length !== 2)
+        throw new Error(
+          `Row ${index + 1}: separate the answer and clue with a comma, tab, or spaces.`,
+        );
+      const answer = unquote(parts[0]).toUpperCase(),
+        clue = unquote(parts[1]);
+      if (!answer || !clue)
+        throw new Error(`Row ${index + 1}: add both an answer and a clue.`);
+      return { id: crypto.randomUUID(), answer, clue };
+    });
 }
+
 export function validateBackup(data) {
   if (
     data?.format !== "crossword-maker" ||

@@ -50,17 +50,14 @@ function notice(message) {
 }
 function save() {
   const snapshot = structuredClone(state);
-  $("#save-status").textContent = "Saving…";
   saving = saving
     .catch(() => {})
     .then(() => writeState(snapshot))
     .then(() => {
-      $("#save-status").textContent = "Saved in this browser";
       storageOK = true;
     })
     .catch(() => {
       storageOK = false;
-      $("#save-status").textContent = "Not saved";
       notice(
         "Browser storage is unavailable or full. Export a backup to keep your work.",
       );
@@ -85,7 +82,7 @@ function shell() {
 <div class="section-heading"><h1>Answers and clues</h1><button id="bulk" class="text-button">Bulk paste</button></div><p class="helper">Answers use A–Z.</p>
 <div class="entries-table"><table aria-label="Answers and clues"><colgroup><col class="selection-column"><col class="number-column"><col class="answer-column"><col><col class="remove-column"></colgroup><thead><tr><th scope="col"><input type="checkbox" id="select-all" aria-label="Select all rows"></th><th scope="col"><span class="sr-only">Row</span></th><th scope="col">Answer</th><th scope="col">Clue</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody id="entries"></tbody></table></div>
 <div class="entry-actions"><div class="row-actions"><button id="add" class="secondary">Add row</button><button id="remove-selected" class="text-button danger" disabled>Remove selected</button></div><button id="example" class="text-button">Load example</button></div>
-<div class="editor-footer"><span id="save-status" role="status">Saved in this browser</span><span>Back up to move browsers.</span></div></section>
+</section>
 <section class="preview-panel" aria-label="Worksheet preview"><div class="preview-toolbar"><div class="segmented" aria-label="Preview type"><button id="worksheet" aria-pressed="true">Worksheet</button><button id="answer-key" aria-pressed="false">Answer key</button></div><label class="paper-select"><span class="sr-only">Paper size</span><select id="paper"><option value="letter">Letter · 8.5 × 11 in</option><option value="legal">Legal · 8.5 × 14 in</option><option value="a4">A4 · 210 × 297 mm</option><option value="a5">A5 · 148 × 210 mm</option></select></label></div>
 <div class="preview-controls"><div class="generation-line"><span class="status-dot"></span><span id="generation-status" role="status" aria-live="polite"></span></div><button id="regenerate" class="text-button">Regenerate</button></div>
 <div id="issues" class="issues" hidden></div><div class="paper-stage"><div id="paper-preview" class="paper"></div><div id="empty-preview"><p>Enter answers and clues to preview the worksheet.</p></div></div>

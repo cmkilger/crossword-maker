@@ -360,15 +360,6 @@ thead th:last-child {
   align-items: center;
   margin-top: 10px;
 }
-.editor-footer {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 5px;
-  font-size: 10px;
-  color: var(--muted);
-  margin-top: 16px;
-}
 .preview-panel {
   position: relative;
   display: flex;

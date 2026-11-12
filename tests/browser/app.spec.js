@@ -20,9 +20,6 @@ test("classroom workflow, preferences, persistence, PDF, backup, deletion and re
   await page.getByRole("button", { name: "Answer key", exact: true }).click();
   await expect(page.locator("#paper-preview")).toContainText("ANSWER KEY");
   const before = await page.locator("#paper-preview").innerHTML();
-  await expect(page.locator("#save-status")).toHaveText(
-    "Saved in this browser",
-  );
   await page.reload();
   await expect(page.locator("#generation-status")).toContainText("12 of 12");
   await page.getByRole("button", { name: "Answer key", exact: true }).click();
@@ -416,9 +413,6 @@ test("dense neighboring words retain their layout after reopening", async ({
     "10 of 10 words placed · 5 × 5 grid",
   );
   const before = await page.locator("#paper-preview").innerHTML();
-  await expect(page.locator("#save-status")).toHaveText(
-    "Saved in this browser",
-  );
   await page.reload();
   await expect(page.locator("#generation-status")).toContainText(
     "10 of 10 words placed · 5 × 5 grid",

@@ -15,7 +15,7 @@ test("classroom workflow, preferences, persistence, PDF, backup, deletion and re
   await page.locator('[data-option="title"]').check();
   await page.locator('[data-option="name"]').check();
   await page.locator('[data-option="answerLines"]').check();
-  await page.locator("#paper").selectOption("a4");
+  await page.locator("#paper").selectOption("legal");
   await page.locator("#theme").selectOption("dark");
   await page.getByRole("button", { name: "Answer key", exact: true }).click();
   await expect(page.locator("#paper-preview")).toContainText("ANSWER KEY");
@@ -28,7 +28,6 @@ test("classroom workflow, preferences, persistence, PDF, backup, deletion and re
   await page.getByRole("button", { name: "Answer key", exact: true }).click();
   expect(await page.locator("#paper-preview").innerHTML()).toBe(before);
   await expect(page.locator("#theme")).toHaveValue("dark");
-  await page.locator("#output-mode").selectOption("both");
   const downloadPromise = page.waitForEvent("download");
   await page.locator("#pdf").click();
   const download = await downloadPromise;
@@ -40,7 +39,7 @@ test("classroom workflow, preferences, persistence, PDF, backup, deletion and re
   await backup.saveAs("test-results/backup.json");
   await page.locator("#new").click();
   await expect(page.locator('[data-option="name"]')).toBeChecked();
-  await expect(page.locator("#paper")).toHaveValue("a4");
+  await expect(page.locator("#paper")).toHaveValue("legal");
   await page.locator("#bulk").click();
   await page.locator("#bulk-input").fill("CAT\tA feline\nACT\tTo perform");
   await page.locator("#bulk-add").click();
@@ -68,7 +67,7 @@ test("classroom workflow, preferences, persistence, PDF, backup, deletion and re
   await expect(page.locator("#puzzles")).toHaveValue(keptPuzzle);
   await page.locator("#import-file").setInputFiles("test-results/backup.json");
   await expect(page.locator("#notice")).toContainText("Imported");
-  await page.locator("#puzzles").selectOption({ label: "AI vocabulary" });
+  await page.locator("#puzzles").selectOption({ label: "Vocabulary" });
   await expect(page.locator("#generation-status")).toContainText("12 of 12");
   await page.locator("#worksheet").click();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -98,8 +97,15 @@ test("page sizing, long-content warnings, duplicate, system appearance and print
   page,
 }) => {
   await page.goto("./");
-  await page.locator("#example").click();
-  await expect(page.locator("#generation-status")).toContainText("12 of 12");
+  await page.locator("#puzzle-name").fill("Vocabulary");
+  await page.locator("#bulk").click();
+  await page
+    .locator("#bulk-input")
+    .fill(
+      "PLANET\tA world\nORBIT\tA path\nSTAR\tA bright sun\nEARTH\tOur planet",
+    );
+  await page.locator("#bulk-add").click();
+  await expect(page.locator("#generation-status")).toContainText("4 of 4");
   await page.locator('[data-option="title"]').check();
   await page.locator('[data-option="name"]').check();
   await page.locator('[data-option="classPeriod"]').check();
@@ -122,16 +128,13 @@ test("page sizing, long-content warnings, duplicate, system appearance and print
       .evaluate((e) => getComputedStyle(e).backgroundColor),
   ).toBe("rgb(32, 33, 36)");
   await page.locator("#duplicate").click();
-  await expect(page.locator("#puzzle-name")).toHaveValue(
-    "AI vocabulary (copy)",
-  );
-  await expect(page.locator("#generation-status")).toContainText("12 of 12");
+  await expect(page.locator("#puzzle-name")).toHaveValue("Vocabulary (copy)");
+  await expect(page.locator("#generation-status")).toContainText("4 of 4");
   await page.evaluate(() => {
     window.print = () => {};
   });
-  await page.locator("#output-mode").selectOption("both");
   await page.locator("#print").click();
-  await expect(page.locator("#print-pages .print-sheet")).toHaveCount(2);
+  await expect(page.locator("#print-pages .print-sheet")).toHaveCount(1);
   await page.emulateMedia({ media: "print" });
   await page.pdf({
     path: "test-results/browser-print.pdf",
@@ -139,10 +142,9 @@ test("page sizing, long-content warnings, duplicate, system appearance and print
     printBackground: true,
   });
   await page.emulateMedia({ media: "screen", colorScheme: "light" });
-  await page
-    .locator('[data-entry="clue"]')
-    .first()
-    .fill("An unusually long clue. ".repeat(85));
+  for (const clue of await page.locator('[data-entry="clue"]').all()) {
+    await clue.fill("An unusually long clue. ".repeat(85));
+  }
   await expect(page.locator("#issues")).toContainText("cannot fit readably");
   await expect(page.locator("#pdf")).toBeDisabled();
 });
@@ -226,11 +228,16 @@ test("compact table and full-page preview fit desktop viewports without page scr
       .toBe(true);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  const answer = await page
-    .locator('[data-entry="answer"]')
-    .first()
-    .boundingBox();
-  const clue = await page.locator('[data-entry="clue"]').first().boundingBox();
+  const { answer, clue } = await page.evaluate(() => ({
+    answer: document
+      .querySelector('[data-entry="answer"]')
+      .getBoundingClientRect()
+      .toJSON(),
+    clue: document
+      .querySelector('[data-entry="clue"]')
+      .getBoundingClientRect()
+      .toJSON(),
+  }));
   expect(Math.abs(answer.y - clue.y)).toBeLessThan(2);
   expect(clue.x).toBeGreaterThan(answer.x + answer.width);
   await page
@@ -249,4 +256,108 @@ test("compact table and full-page preview fit desktop viewports without page scr
   await page.screenshot({ path: "test-results/compact-light.png" });
   await page.locator("#theme").selectOption("dark");
   await page.screenshot({ path: "test-results/compact-dark.png" });
+});
+
+test("example confirmation preserves work and print/PDF follow the selected preview", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await page.locator('[data-entry="answer"]').fill("CAT");
+  await page.locator('[data-entry="clue"]').fill("A feline");
+  const original = await page.locator("#puzzles").inputValue();
+  await page.locator("#example").click();
+  await expect(page.locator("#example-dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.locator('[data-entry="answer"]')).toHaveValue("CAT");
+  await page.locator("#example").click();
+  await page
+    .locator("#example-dialog")
+    .getByRole("button", { name: "Load example", exact: true })
+    .click();
+  await expect(page.locator("#puzzle-name")).toHaveValue("Vocabulary");
+  await expect(
+    page.locator(`#puzzles option[value="${original}"]`),
+  ).toHaveCount(1);
+  await expect(page.locator("#pdf")).toBeEnabled();
+  await page.locator("#example").click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#example-dialog")).not.toBeVisible();
+  await expect(page.locator("#puzzles option")).toHaveCount(2);
+  await expect(page.locator("#output-mode")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Remove word 1", exact: true }),
+  ).toHaveText("×");
+  await page.evaluate(() => {
+    window.print = () => {};
+  });
+  for (const key of [false, true]) {
+    await page.locator(key ? "#answer-key" : "#worksheet").click();
+    await page.locator("#print").click();
+    await expect(page.locator("#print-pages .print-sheet")).toHaveCount(1);
+    expect(await page.locator("#print-pages .print-sheet").innerHTML()).toBe(
+      await page.locator("#paper-preview").innerHTML(),
+    );
+    const promise = page.waitForEvent("download");
+    await page.locator("#pdf").click();
+    const file = await promise;
+    expect(file.suggestedFilename()).toBe(
+      key ? "Vocabulary-key.pdf" : "Vocabulary.pdf",
+    );
+    await file.saveAs(
+      `test-results/current-preview-${key ? "key" : "worksheet"}.pdf`,
+    );
+  }
+});
+
+test("populated row removal confirms, while empty and bulk rows follow selection rules", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await page
+    .getByRole("button", { name: "Remove word 1", exact: true })
+    .click();
+  await expect(page.locator("#entries tr")).toHaveCount(0);
+  await expect(page.locator("#remove-dialog")).not.toBeVisible();
+  await page.locator("#add").click();
+  await expect(page.locator('[data-entry="answer"]').first()).toBeFocused();
+  await page.locator('[data-entry="answer"]').fill("CAT");
+  await page.locator('[data-entry="clue"]').fill("A feline");
+  await page
+    .getByRole("button", { name: "Remove word 1", exact: true })
+    .click();
+  await expect(page.locator("#remove-dialog")).toBeVisible();
+  await page.getByRole("button", { name: "Keep rows", exact: true }).click();
+  await expect(page.locator('[data-entry="answer"]')).toHaveValue("CAT");
+  await page.locator("#add").click();
+  await page.locator("#select-all").check();
+  await expect(page.locator("#remove-selected")).toHaveText(
+    "Remove selected (2)",
+  );
+  await page
+    .getByRole("checkbox", { name: "Select row 2", exact: true })
+    .uncheck();
+  expect(
+    await page.locator("#select-all").evaluate((el) => el.indeterminate),
+  ).toBe(true);
+  await page.locator("#remove-selected").click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator("#remove-dialog")).not.toBeVisible();
+  await expect(
+    page.getByRole("checkbox", { name: "Select row 1", exact: true }),
+  ).toBeChecked();
+  await page.locator("#select-all").check();
+  await page.locator("#remove-selected").click();
+  await expect(page.locator("#remove-heading")).toHaveText("Remove 2 rows?");
+  await page
+    .locator("#remove-dialog")
+    .getByRole("button", { name: "Remove", exact: true })
+    .click();
+  await expect(page.locator("#entries tr")).toHaveCount(0);
+  await expect(page.locator("#remove-selected")).toBeDisabled();
+  await page.locator("#add").click();
+  await page.locator('[data-entry="clue"]').fill("A clue without an answer");
+  await page
+    .getByRole("button", { name: "Remove word 1", exact: true })
+    .click();
+  await expect(page.locator("#remove-dialog")).toBeVisible();
 });

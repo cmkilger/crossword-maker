@@ -15,7 +15,7 @@ import {
   cellsFor,
   numberLayout,
 } from "./generator.js";
-import { loadFont, makePage, pageSVG, exportPDF } from "./page.js";
+import { loadFont, makePage, pageSVG, exportPDF, sizes } from "./page.js";
 const $ = (s) => document.querySelector(s),
   esc = (s) =>
     String(s).replace(
@@ -42,6 +42,8 @@ let state = {
   previewKey = false,
   storageOK = true;
 const current = () => state.puzzles.find((p) => p.id === state.active);
+let selectedRows = new Set();
+let pendingRemoval = [];
 const blankEntry = () => ({ id: crypto.randomUUID(), answer: "", clue: "" });
 function notice(message) {
   $("#notice").textContent = message;
@@ -82,15 +84,15 @@ function shell() {
 <fieldset class="worksheet-options"><legend>Worksheet fields</legend><div class="option-grid"><label><input type="checkbox" data-option="title"> Title</label><label><input type="checkbox" data-option="name"> Name</label><label><input type="checkbox" data-option="classPeriod"> Class period</label><label><input type="checkbox" data-option="date"> Date</label><label><input type="checkbox" data-option="answerLines"> Clue answer lines</label></div></fieldset>
 <div id="title-field" class="inline-field"><label for="title">Printed title</label><input id="title" maxlength="500" placeholder="Worksheet title"></div>
 <div class="section-heading"><h1>Answers and clues</h1><button id="bulk" class="text-button">Bulk paste</button></div><p class="helper">Answers use A–Z.</p>
-<div class="entries-table"><table aria-label="Answers and clues"><colgroup><col class="number-column"><col class="answer-column"><col><col class="remove-column"></colgroup><thead><tr><th scope="col"><span class="sr-only">Row</span></th><th scope="col">Answer</th><th scope="col">Clue</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody id="entries"></tbody></table></div>
-<div class="entry-actions"><button id="add" class="secondary">Add row</button><button id="example" class="text-button">Load example</button></div>
+<div class="entries-table"><table aria-label="Answers and clues"><colgroup><col class="selection-column"><col class="number-column"><col class="answer-column"><col><col class="remove-column"></colgroup><thead><tr><th scope="col"><input type="checkbox" id="select-all" aria-label="Select all rows"></th><th scope="col"><span class="sr-only">Row</span></th><th scope="col">Answer</th><th scope="col">Clue</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody id="entries"></tbody></table></div>
+<div class="entry-actions"><div class="row-actions"><button id="add" class="secondary">Add row</button><button id="remove-selected" class="text-button danger" disabled>Remove selected</button></div><button id="example" class="text-button">Load example</button></div>
 <div class="editor-footer"><span id="save-status" role="status">Saved in this browser</span><span>Back up to move browsers.</span></div></section>
 <section class="preview-panel" aria-label="Worksheet preview"><div class="preview-toolbar"><div class="segmented" aria-label="Preview type"><button id="worksheet" aria-pressed="true">Worksheet</button><button id="answer-key" aria-pressed="false">Answer key</button></div><label class="paper-select"><span class="sr-only">Paper size</span><select id="paper"><option value="letter">Letter · 8.5 × 11 in</option><option value="legal">Legal · 8.5 × 14 in</option><option value="a4">A4 · 210 × 297 mm</option><option value="a5">A5 · 148 × 210 mm</option></select></label></div>
 <div class="preview-controls"><div class="generation-line"><span class="status-dot"></span><span id="generation-status" role="status" aria-live="polite"></span></div><button id="regenerate" class="text-button">Regenerate</button></div>
 <div id="issues" class="issues" hidden></div><div class="paper-stage"><div id="paper-preview" class="paper"></div><div id="empty-preview"><p>Enter answers and clues to preview the worksheet.</p></div></div>
-<div class="output-bar"><label><span class="sr-only">Pages to export</span><select id="output-mode"><option value="worksheet">Worksheet only</option><option value="key">Answer key only</option><option value="both">Worksheet + answer key</option></select></label><div><button id="print" class="secondary">Print</button><button id="pdf" class="primary">Download PDF</button></div></div><span id="page-detail" class="sr-only"></span></section></main>
+<div class="output-bar"><div><button id="print" class="secondary">Print</button><button id="pdf" class="primary">Download PDF</button></div></div><span id="page-detail" class="sr-only"></span></section></main>
 <dialog id="bulk-dialog"><form method="dialog"><div class="dialog-heading"><h2>Bulk paste</h2><button class="secondary" value="cancel" aria-label="Close">Close</button></div><p>Copy two columns from a spreadsheet: <strong>answer</strong>, then <strong>clue</strong>. One pair per row, without a header. These will be added to your existing words.</p><label class="field-label" for="bulk-input">Answers and clues</label><textarea id="bulk-input" rows="10" placeholder="PLANET&#9;A world orbiting a star"></textarea><p id="bulk-error" class="error" role="alert"></p><button id="bulk-add" type="button" class="primary">Add words</button></form></dialog>
-<dialog id="delete-dialog"><form method="dialog"><h2>Delete this puzzle?</h2><p id="delete-message"></p><div class="dialog-actions"><button value="cancel" class="secondary">Keep puzzle</button><button value="delete" class="destructive">Delete puzzle</button></div></form></dialog><div id="print-pages"></div>`;
+<dialog id="delete-dialog"><form method="dialog"><h2>Delete this puzzle?</h2><p id="delete-message"></p><div class="dialog-actions"><button value="cancel" class="secondary">Keep puzzle</button><button value="delete" class="destructive">Delete puzzle</button></div></form></dialog><dialog id="example-dialog"><form method="dialog"><h2>Load example puzzle?</h2><p>Your current puzzle will stay saved. A new example puzzle will open.</p><div class="dialog-actions"><button value="cancel" class="secondary">Cancel</button><button value="load" class="primary">Load example</button></div></form></dialog><dialog id="remove-dialog"><form method="dialog"><h2 id="remove-heading">Remove row?</h2><p id="remove-message"></p><div class="dialog-actions"><button value="cancel" class="secondary">Keep rows</button><button value="remove" class="destructive">Remove</button></div></form></dialog><div id="print-pages"></div>`;
 }
 function library() {
   const p = current();
@@ -103,6 +105,7 @@ function library() {
   $("#puzzles").value = p.id;
 }
 function renderPuzzle() {
+  selectedRows.clear();
   const p = current();
   library();
   $("#puzzle-name").value = p.name;
@@ -121,10 +124,45 @@ function renderEntries() {
   $("#entries").innerHTML = p.entries
     .map((e, i) => {
       const error = checked.find((v) => v.id === e.id)?.error;
-      return `<tr class="entry" data-id="${esc(e.id)}"><th scope="row" class="entry-index">${i + 1}</th><td><label class="sr-only" for="answer-${esc(e.id)}">Answer ${i + 1}</label><input id="answer-${esc(e.id)}" data-entry="answer" value="${esc(e.answer)}" maxlength="60" placeholder="Answer" autocomplete="off" spellcheck="false" aria-describedby="error-${esc(e.id)}"><p class="entry-error" id="error-${esc(e.id)}">${esc(error || "")}</p></td><td><label class="sr-only" for="clue-${esc(e.id)}">Clue ${i + 1}</label><textarea id="clue-${esc(e.id)}" data-entry="clue" rows="1" maxlength="2000" placeholder="Clue">${esc(e.clue)}</textarea></td><td><button class="remove-entry text-button" aria-label="Remove word ${i + 1}" data-remove="${esc(e.id)}">Remove</button></td></tr>`;
+      return `<tr class="entry" data-id="${esc(e.id)}"><td class="selection-cell"><input type="checkbox" data-select="${esc(e.id)}" aria-label="Select row ${i + 1}" ${selectedRows.has(e.id) ? "checked" : ""}></td><th scope="row" class="entry-index">${i + 1}</th><td><label class="sr-only" for="answer-${esc(e.id)}">Answer ${i + 1}</label><input id="answer-${esc(e.id)}" data-entry="answer" value="${esc(e.answer)}" maxlength="60" placeholder="Answer" autocomplete="off" spellcheck="false" aria-describedby="error-${esc(e.id)}"><p class="entry-error" id="error-${esc(e.id)}">${esc(error || "")}</p></td><td><label class="sr-only" for="clue-${esc(e.id)}">Clue ${i + 1}</label><textarea id="clue-${esc(e.id)}" data-entry="clue" rows="1" maxlength="2000" placeholder="Clue">${esc(e.clue)}</textarea></td><td><button class="remove-entry text-button" aria-label="Remove word ${i + 1}" data-remove="${esc(e.id)}" title="Remove word ${i + 1}">×</button></td></tr>`;
     })
     .join("");
   document.querySelectorAll("[data-entry=clue]").forEach(sizeClue);
+  updateSelection();
+}
+function updateSelection() {
+  const ids = new Set(current().entries.map((e) => e.id));
+  selectedRows = new Set([...selectedRows].filter((id) => ids.has(id)));
+  const all = $("#select-all");
+  all.checked = ids.size > 0 && selectedRows.size === ids.size;
+  all.indeterminate = selectedRows.size > 0 && selectedRows.size < ids.size;
+  all.disabled = ids.size === 0;
+  $("#remove-selected").disabled = selectedRows.size === 0;
+  $("#remove-selected").textContent = selectedRows.size
+    ? `Remove selected (${selectedRows.size})`
+    : "Remove selected";
+}
+function removeRows(ids) {
+  const remove = new Set(ids);
+  current().entries = current().entries.filter((e) => !remove.has(e.id));
+  renderEntries();
+  queueGenerate();
+  save();
+}
+function requestRemoval(ids) {
+  const rows = current().entries.filter((e) => ids.includes(e.id));
+  if (!rows.length) return;
+  if (!rows.some((e) => e.answer.trim() || e.clue.trim())) {
+    removeRows(ids);
+    return;
+  }
+  pendingRemoval = ids;
+  $("#remove-heading").textContent =
+    rows.length === 1 ? "Remove this row?" : `Remove ${rows.length} rows?`;
+  $("#remove-message").textContent =
+    "The selected answers and clues will be permanently removed from this puzzle.";
+  $("#remove-dialog").returnValue = "";
+  $("#remove-dialog").showModal();
 }
 function sizeClue(el) {
   el.style.height = "auto";
@@ -132,21 +170,80 @@ function sizeClue(el) {
 }
 function fitPreview() {
   const stage = $(".paper-stage"),
-    paper = $("#paper-preview");
+    paper = $("#paper-preview"),
+    panel = $(".preview-panel");
   const svg = paper?.querySelector("svg");
-  if (!svg || !stage.clientHeight) return;
+  if (!svg) return;
   const ratio = svg.viewBox.baseVal.width / svg.viewBox.baseVal.height;
-  const style = getComputedStyle(stage);
+  const style = getComputedStyle(stage),
+    panelStyle = getComputedStyle(panel);
+  const horizontal = (css) =>
+    parseFloat(css.paddingLeft) +
+    parseFloat(css.paddingRight) +
+    parseFloat(css.borderLeftWidth) +
+    parseFloat(css.borderRightWidth);
+  const vertical = (css) =>
+    parseFloat(css.paddingTop) +
+    parseFloat(css.paddingBottom) +
+    parseFloat(css.borderTopWidth) +
+    parseFloat(css.borderBottomWidth);
+  const controlsHeight = [...panel.children]
+    .filter((el) => el !== stage)
+    .reduce((total, el) => {
+      const css = getComputedStyle(el);
+      if (css.display === "none" || css.position === "absolute") return total;
+      return (
+        total +
+        el.getBoundingClientRect().height +
+        parseFloat(css.marginTop) +
+        parseFloat(css.marginBottom)
+      );
+    }, 0);
+  const availableHeight = Math.max(
+    0,
+    panel.clientHeight -
+      parseFloat(panelStyle.paddingTop) -
+      parseFloat(panelStyle.paddingBottom) -
+      controlsHeight -
+      vertical(style),
+  );
+  if (window.matchMedia("(min-width: 761px)").matches) {
+    const controlsWidth = Math.max(
+      ...[".preview-toolbar", ".output-bar"].map((selector) => {
+        const row = $(selector);
+        return (
+          [...row.children].reduce(
+            (sum, child) => sum + child.getBoundingClientRect().width,
+            0,
+          ) +
+          parseFloat(getComputedStyle(row).columnGap) *
+            (row.children.length - 1)
+        );
+      }),
+    );
+    const widestRatio = Math.max(
+      ...Object.values(sizes).map(([w, h]) => w / h),
+    );
+    const needed =
+      Math.max(
+        controlsWidth,
+        availableHeight * widestRatio + horizontal(style),
+      ) + horizontal(panelStyle);
+    const availableWidth = Math.max(0, $(".workspace").clientWidth - 430);
+    $(".workspace").style.setProperty(
+      "--preview-width",
+      `${Math.ceil(Math.min(needed, availableWidth))}px`,
+    );
+  }
   const width =
     stage.clientWidth -
     parseFloat(style.paddingLeft) -
     parseFloat(style.paddingRight);
-  const height =
-    stage.clientHeight -
-    parseFloat(style.paddingTop) -
-    parseFloat(style.paddingBottom);
-  paper.style.width = `${Math.max(0, Math.min(width, height * ratio))}px`;
+  const paperWidth = Math.max(0, Math.min(width, availableHeight * ratio));
+  paper.style.width = `${paperWidth}px`;
+  stage.style.height = `${paperWidth / ratio + vertical(style)}px`;
 }
+
 function valid() {
   return validateEntries(current().entries.filter((e) => e.answer || e.clue));
 }
@@ -188,24 +285,12 @@ function renderPreview() {
     );
   $("#issues").hidden = !messages.length;
   $("#issues").textContent = messages.join(" ");
-  const mode = $("#output-mode").value;
-  const outputFits =
-    (mode === "worksheet" || mode === "both"
-      ? makePage(p, false).fits
-      : true) &&
-    (mode === "key" || mode === "both" ? makePage(p, true).fits : true);
-  if (!outputFits && page.fits) {
-    $("#issues").hidden = false;
-    $("#issues").textContent +=
-      " The selected output cannot fit readably on one page. Use larger paper or shorten the puzzle.";
-  }
   const disabled =
     generating ||
     !hasWords ||
     !!invalid.length ||
     !!unplaced.length ||
-    !page.fits ||
-    !outputFits;
+    !page.fits;
   $("#pdf").disabled = disabled;
   $("#print").disabled = disabled;
   $("#regenerate").disabled = !entries.some((e) => !e.error);
@@ -409,10 +494,29 @@ function wire() {
   $("#entries").onclick = (e) => {
     const id = e.target.dataset.remove;
     if (!id) return;
-    current().entries = current().entries.filter((e) => e.id !== id);
-    renderEntries();
-    queueGenerate();
-    save();
+    requestRemoval([id]);
+  };
+  $("#entries").onchange = (e) => {
+    const id = e.target.dataset.select;
+    if (!id) return;
+    if (e.target.checked) selectedRows.add(id);
+    else selectedRows.delete(id);
+    updateSelection();
+  };
+  $("#select-all").onchange = (e) => {
+    selectedRows = e.target.checked
+      ? new Set(current().entries.map((e) => e.id))
+      : new Set();
+    document
+      .querySelectorAll("[data-select]")
+      .forEach((el) => (el.checked = e.target.checked));
+    updateSelection();
+  };
+  $("#remove-selected").onclick = () => requestRemoval([...selectedRows]);
+  $("#remove-dialog").onclose = () => {
+    if ($("#remove-dialog").returnValue === "remove")
+      removeRows(pendingRemoval);
+    pendingRemoval = [];
   };
   $("#add").onclick = () => {
     if (current().entries.length >= 200) {
@@ -422,7 +526,7 @@ function wire() {
     current().entries.push(blankEntry());
     renderEntries();
     save();
-    $("#entries .entry:last-child input").focus();
+    $('#entries .entry:last-child [data-entry="answer"]').focus();
   };
   $("#bulk").onclick = () => {
     $("#bulk-input").value = "";
@@ -457,23 +561,17 @@ function wire() {
     previewKey = true;
     renderPreview();
   };
-  $("#output-mode").onchange = renderPreview;
   $("#pdf").onclick = () => {
     try {
-      exportPDF(current(), $("#output-mode").value);
+      exportPDF(current(), previewKey);
     } catch (e) {
       notice(e.message);
     }
   };
   $("#print").onclick = () => {
-    const p = current(),
-      mode = $("#output-mode").value;
-    const keys = mode === "both" ? [false, true] : [mode === "key"];
-    $("#print-pages").innerHTML = keys
-      .map(
-        (key) => `<div class="print-sheet">${pageSVG(makePage(p, key))}</div>`,
-      )
-      .join("");
+    const p = current();
+    $("#print-pages").innerHTML =
+      `<div class="print-sheet">${pageSVG(makePage(p, previewKey))}</div>`;
     let style = $("#print-size");
     if (!style) {
       style = document.createElement("style");
@@ -513,10 +611,10 @@ function wire() {
     }
     e.target.value = "";
   };
-  $("#example").onclick = () => {
+  const loadExample = () => {
     const p = newPuzzle(state.defaults);
-    p.name = "AI vocabulary";
-    p.title = "AI Vocabulary Quiz";
+    p.name = "Vocabulary";
+    p.title = "Vocabulary Quiz";
     p.entries = [
       ["CIRCUMVENT", "To find a way around a rule, obstacle, or problem."],
       ["CONSEQUENCE", "A result or effect of an action or decision."],
@@ -536,6 +634,20 @@ function wire() {
     ].map(([answer, clue]) => ({ id: crypto.randomUUID(), answer, clue }));
     state.puzzles.push(p);
     switchTo(p.id);
+  };
+  $("#example").onclick = () => {
+    const p = current();
+    const hasData =
+      p.entries.some((e) => e.answer.trim() || e.clue.trim()) ||
+      p.title.trim() ||
+      (p.name.trim() && p.name !== "Untitled puzzle");
+    if (hasData) {
+      $("#example-dialog").returnValue = "";
+      $("#example-dialog").showModal();
+    } else loadExample();
+  };
+  $("#example-dialog").onclose = () => {
+    if ($("#example-dialog").returnValue === "load") loadExample();
   };
   window.addEventListener("beforeunload", (e) => {
     if (!storageOK) {
@@ -584,6 +696,7 @@ async function init() {
       document.querySelectorAll("[data-entry=clue]").forEach(sizeClue);
     });
     observer.observe($(".paper-stage"));
+    observer.observe($(".preview-panel"));
     observer.observe($(".editor"));
     renderPuzzle();
     $("#app").setAttribute("aria-busy", "false");

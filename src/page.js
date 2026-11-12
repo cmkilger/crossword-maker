@@ -6,25 +6,32 @@ export const sizes = {
   a4: [595.28, 841.89],
   a5: [419.53, 595.28],
 };
-let fontData;
+const fontData = {};
 export async function loadFont() {
-  const response = await fetch(
-    `${import.meta.env.BASE_URL}fonts/NotoSans-Regular.ttf`,
+  await Promise.all(
+    ["Regular", "Bold"].map(async (weight) => {
+      const response = await fetch(
+        `${import.meta.env.BASE_URL}fonts/NotoSans-${weight}.ttf`,
+      );
+      if (!response.ok) throw new Error("Could not load the worksheet font.");
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      let binary = "";
+      for (let i = 0; i < bytes.length; i += 8192)
+        binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+      fontData[weight] = btoa(binary);
+    }),
   );
-  if (!response.ok) throw new Error("Could not load the worksheet font.");
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 8192)
-    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-  fontData = btoa(binary);
 }
+
 function documentFor(size) {
   const doc = new jsPDF({
     unit: "pt",
     format: sizes[size],
     orientation: "portrait",
   });
-  doc.addFileToVFS("Noto.ttf", fontData);
+  doc.addFileToVFS("Noto.ttf", fontData.Regular);
+  doc.addFileToVFS("Noto-Bold.ttf", fontData.Bold);
+  doc.addFont("Noto-Bold.ttf", "Noto", "bold");
   doc.addFont("Noto.ttf", "Noto", "normal");
   doc.setFont("Noto");
   return doc;
@@ -48,8 +55,8 @@ export function makePage(puzzle, answerKey = false) {
     usable = width - 2 * margin,
     doc = documentFor(size),
     cmds = [];
-  const text = (value, x, y, size = 11, align = "left") =>
-    cmds.push({ kind: "text", value, x, y, size, align });
+  const text = (value, x, y, size = 11, align = "left", bold = false) =>
+    cmds.push({ kind: "text", value, x, y, size, align, bold });
   const line = (x, y, x2, y2, weight = 0.7) =>
     cmds.push({ kind: "line", x, y, x2, y2, weight });
   let y = margin + 11;
@@ -89,32 +96,42 @@ export function makePage(puzzle, answerKey = false) {
   const gap = 22,
     colWidth = (usable - gap) / 2;
   function clueColumns(font) {
+    doc.setFont("Noto", "normal");
     doc.setFontSize(font);
+    const indent =
+      doc.getTextWidth(`${Math.max(1, ...placed.map((p) => p.number))}.`) + 6;
     return ["across", "down"].map((dir) => {
       const result = [];
       let cy = font + 9;
       for (const p of placed
         .filter((p) => p.dir === dir)
         .sort((a, b) => a.number - b.number)) {
-        const prefix = `${p.number}. `,
-          indent = doc.getTextWidth(prefix),
-          lines = doc.splitTextToSize(p.clue, colWidth - indent);
+        const lines = doc.splitTextToSize(p.clue, colWidth - indent);
+        result.push({
+          kind: "text",
+          value: `${p.number}.`,
+          x: indent - 6,
+          y: cy,
+          size: font,
+          align: "right",
+        });
         lines.forEach((l, i) =>
           result.push({
             kind: "text",
-            value: i === 0 ? prefix + l : l,
-            x: i === 0 ? 0 : indent,
+            value: l,
+            x: indent,
             y: cy + i * font * 1.35,
             size: font,
           }),
         );
         cy += Math.max(1, lines.length) * font * 1.35;
         if (puzzle.options.answerLines) {
+          cy += 12;
           result.push({
             kind: "line",
             x: indent,
             y: cy - 1,
-            x2: Math.min(colWidth, indent + 110),
+            x2: colWidth,
             y2: cy - 1,
             weight: 0.6,
           });
@@ -146,7 +163,7 @@ export function makePage(puzzle, answerKey = false) {
     !placed.length ||
     (cell >= 13 &&
       height - margin - y - Math.max(...columns.map((c) => c.height)) - 39 >=
-        layout.height * cell);
+        layout.height * cell - 0.01);
   if (placed.length && fits) {
     const gx = (width - layout.width * cell) / 2,
       gy = y + 3;
@@ -159,8 +176,8 @@ export function makePage(puzzle, answerKey = false) {
         text(
           String(starts[0].number),
           x + 1.5,
-          cy + Math.max(6, cell * 0.27),
-          Math.max(5, cell * 0.24),
+          cy + Math.min(9, Math.max(6.5, cell * 0.32)) + 1.5,
+          Math.min(9, Math.max(6.5, cell * 0.32)),
         );
       if (answerKey)
         text(c.letter, x + cell / 2, cy + cell * 0.77, cell * 0.57, "center");
@@ -168,7 +185,7 @@ export function makePage(puzzle, answerKey = false) {
     y = gy + layout.height * cell + 28;
     ["Across", "Down"].forEach((heading, i) => {
       const x = margin + i * (colWidth + gap);
-      text(heading, x, y, font + 2);
+      text(heading, x, y, font + 2, "left", true);
       for (const c of columns[i].result)
         cmds.push({
           ...c,
@@ -181,32 +198,29 @@ export function makePage(puzzle, answerKey = false) {
   return { width, height, cmds, fits, font, cell };
 }
 export function pageSVG(page) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Printable crossword worksheet" viewBox="0 0 ${page.width} ${page.height}" width="${page.width}" height="${page.height}"><rect width="100%" height="100%" fill="white"/>${page.cmds.map((c) => (c.kind === "text" ? `<text x="${c.x}" y="${c.y}" font-family="Worksheet, sans-serif" font-size="${c.size}" fill="black" text-anchor="${c.align === "center" ? "middle" : "start"}">${escape(c.value)}</text>` : c.kind === "rect" ? `<rect x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}" fill="white" stroke="black" stroke-width=".7"/>` : `<line x1="${c.x}" y1="${c.y}" x2="${c.x2}" y2="${c.y2}" stroke="black" stroke-width="${c.weight}"/>`)).join("")}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Printable crossword worksheet" viewBox="0 0 ${page.width} ${page.height}" width="${page.width}" height="${page.height}"><rect width="100%" height="100%" fill="white"/>${page.cmds.map((c) => (c.kind === "text" ? `<text x="${c.x}" y="${c.y}" font-family="Worksheet, sans-serif" font-size="${c.size}" font-weight="${c.bold ? 700 : 400}" fill="black" text-anchor="${c.align === "center" ? "middle" : c.align === "right" ? "end" : "start"}">${escape(c.value)}</text>` : c.kind === "rect" ? `<rect x="${c.x}" y="${c.y}" width="${c.width}" height="${c.height}" fill="white" stroke="black" stroke-width=".7"/>` : `<line x1="${c.x}" y1="${c.y}" x2="${c.x2}" y2="${c.y2}" stroke="black" stroke-width="${c.weight}"/>`)).join("")}</svg>`;
 }
-export function exportPDF(puzzle, mode) {
+export function exportPDF(puzzle, answerKey = false) {
   const doc = documentFor(puzzle.options.size);
-  const keys = mode === "both" ? [false, true] : [mode === "key"];
-  keys.forEach((key, i) => {
-    if (i) doc.addPage(sizes[puzzle.options.size]);
-    const page = makePage(puzzle, key);
-    if (!page.fits)
-      throw new Error(
-        "This puzzle is too large for one readable page. Shorten it or choose larger paper.",
-      );
-    for (const c of page.cmds) {
-      if (c.kind === "text") {
-        doc.setFontSize(c.size);
-        doc.text(c.value, c.x, c.y, { align: c.align || "left" });
-      } else if (c.kind === "rect") {
-        doc.setLineWidth(0.7);
-        doc.rect(c.x, c.y, c.width, c.height);
-      } else {
-        doc.setLineWidth(c.weight);
-        doc.line(c.x, c.y, c.x2, c.y2);
-      }
+  const page = makePage(puzzle, answerKey);
+  if (!page.fits)
+    throw new Error(
+      "This puzzle is too large for one readable page. Shorten it or choose larger paper.",
+    );
+  for (const c of page.cmds) {
+    if (c.kind === "text") {
+      doc.setFont("Noto", c.bold ? "bold" : "normal");
+      doc.setFontSize(c.size);
+      doc.text(c.value, c.x, c.y, { align: c.align || "left" });
+    } else if (c.kind === "rect") {
+      doc.setLineWidth(0.7);
+      doc.rect(c.x, c.y, c.width, c.height);
+    } else {
+      doc.setLineWidth(c.weight);
+      doc.line(c.x, c.y, c.x2, c.y2);
     }
-  });
+  }
   doc.save(
-    `${puzzle.name.replace(/[^a-z0-9_-]/gi, "-") || "crossword"}${mode === "key" ? "-key" : ""}.pdf`,
+    `${puzzle.name.replace(/[^a-z0-9_-]/gi, "-") || "crossword"}${answerKey ? "-key" : ""}.pdf`,
   );
 }

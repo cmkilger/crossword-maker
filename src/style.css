@@ -193,7 +193,7 @@ textarea:focus-visible {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(430px, 43%) minmax(0, 1fr);
+  grid-template-columns: minmax(430px, 1fr) minmax(0, var(--preview-width, 43%));
 }
 .editor {
   position: relative;
@@ -274,7 +274,7 @@ col.answer-column {
   width: 31%;
 }
 col.remove-column {
-  width: 56px;
+  width: 32px;
 }
 thead th {
   font-size: 11px;
@@ -338,7 +338,10 @@ thead th:last-child {
   background: var(--input);
 }
 .remove-entry {
-  font-size: 10px;
+  font-size: 20px;
+  width: 28px;
+  min-height: 30px;
+  line-height: 1;
   color: var(--muted);
   padding: 8px 2px;
 }
@@ -431,7 +434,7 @@ thead th:last-child {
 }
 .paper-stage {
   position: relative;
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
   min-width: 0;
   background: var(--stage);
@@ -573,7 +576,10 @@ dialog p {
     gap: 12px;
   }
   .workspace {
-    grid-template-columns: 430px minmax(0, 1fr);
+    grid-template-columns: minmax(430px, 1fr) minmax(
+        0,
+        var(--preview-width, 43%)
+      );
   }
   .preview-panel {
     padding: 12px;
@@ -663,7 +669,7 @@ dialog p {
     width: 24px;
   }
   col.remove-column {
-    width: 47px;
+    width: 32px;
   }
   col.answer-column {
     width: 30%;
@@ -672,9 +678,7 @@ dialog p {
   .entry textarea {
     padding: 6px 3px;
   }
-  .remove-entry {
-    font-size: 9px;
-  }
+
   .inline-field {
     grid-template-columns: 82px minmax(0, 1fr);
   }
@@ -714,4 +718,47 @@ dialog p {
     height: 100%;
     display: block;
   }
+}
+
+@media (min-width: 761px) {
+  .preview-toolbar > *,
+  .output-bar > * {
+    flex-shrink: 0;
+  }
+}
+
+.output-bar {
+  justify-content: flex-end;
+}
+
+col.selection-column {
+  width: 27px;
+}
+.selection-cell,
+thead th:first-child {
+  text-align: center;
+}
+.entry .selection-cell {
+  padding-top: 11px;
+}
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.entry input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  min-height: 15px;
+  padding: 0;
+  display: inline-block;
+}
+
+@font-face {
+  font-family: Worksheet;
+  src: url("/fonts/NotoSans-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-display: swap;
 }

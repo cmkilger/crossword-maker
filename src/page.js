@@ -61,17 +61,24 @@ export function makePage(puzzle, answerKey = false) {
     cmds.push({ kind: "line", x, y, x2, y2, weight });
   let y = margin + 11;
   const fields = [
-    puzzle.options.classPeriod ? "Period" : null,
-    puzzle.options.date ? "Date" : null,
-    puzzle.options.name ? "Name" : null,
+    puzzle.options.name ? { label: "Name", weight: 2 } : null,
+    puzzle.options.date ? { label: "Date", weight: 1 } : null,
+    puzzle.options.classPeriod ? { label: "Period", weight: 1 } : null,
   ].filter(Boolean);
   if (fields.length) {
-    const fw = (usable - 16 * (fields.length - 1)) / fields.length;
-    fields.forEach((label, i) => {
-      const x = margin + i * (fw + 16);
-      text(label, x, y);
+    const gap = 16,
+      fieldSpace = usable - gap * (fields.length - 1),
+      totalWeight = fields.reduce((sum, field) => sum + field.weight, 0);
+    let x = margin;
+    fields.forEach((field, i) => {
+      const fw =
+        i === fields.length - 1
+          ? width - margin - x
+          : (fieldSpace * field.weight) / totalWeight;
+      text(field.label, x, y);
       doc.setFontSize(11);
-      line(x + doc.getTextWidth(label) + 6, y + 1, x + fw, y + 1);
+      line(x + doc.getTextWidth(field.label) + 6, y + 1, x + fw, y + 1);
+      x += fw + gap;
     });
     y += 29;
   }
